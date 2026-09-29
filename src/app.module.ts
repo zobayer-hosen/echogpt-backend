@@ -20,6 +20,7 @@ import { ChatModule } from './modules/chat/chat.module';
 import { HealthModule } from './modules/health/health.module';
 import { LoggingModule } from './modules/logging/logging.module';
 import { ProvidersModule } from './modules/providers/providers.module';
+import { SearchModule } from './modules/search/search.module';
 import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
 import { UsersModule } from './modules/users/users.module';
 
@@ -67,6 +68,7 @@ import { UsersModule } from './modules/users/users.module';
     SubscriptionsModule,
     ProvidersModule,
     ChatModule,
+    SearchModule,
   ],
   providers: [
     RequestLoggingInterceptor,

@@ -17,3 +17,8 @@ export function collapseWhitespace(value: string): string {
 export function conversationTitle(prompt: string): string {
   return collapseWhitespace(prompt).slice(0, 60) || 'New chat';
 }
+
+/** Search cache/suggestion key: lowercase, trimmed, single spaces. */
+export function normalizeQuery(query: string): string {
+  return collapseWhitespace(query).toLowerCase();
+}

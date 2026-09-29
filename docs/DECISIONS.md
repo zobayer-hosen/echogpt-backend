@@ -43,3 +43,7 @@ this file records choices made while building.
 | D36 | `POST /chat/messages` creates the conversation inside the save transaction, after the AI answered. | A failed AI call leaves no empty conversation behind. |
 | D37 | Message timestamps are set by the app (USER = when sent, ASSISTANT = after the answer); ordering also uses `role` as a tie-breaker. | `now()` is the transaction start time, so both rows would otherwise share one timestamp. |
 | D38 | Chat responses include the full usage object (`plan, limit, used, remaining, resetsAt`), not only `remaining`. | PRD asks for `usage.remaining`; the rest costs nothing and saves the extension a call. |
+| D39 | The search cache is shared across users and only reuses **non-cached** rows (`from_cache = false`) younger than the TTL. | A web answer isn't personal; skipping cached rows stops a chain of cache hits from keeping an answer alive past 1 hour. |
+| D40 | A cache hit writes no AI fields to `api_usage_logs` (feature/provider/ai_success stay null). | ERD §3: those fields are filled only when a provider was actually called, so AI analytics stay accurate. |
+| D41 | "Popular" suggestions need at least 2 different users in the last 7 days. | One person's searches are never suggested to someone else. |
+| D42 | `POST /search` answers `200 OK` (not 201). | It is a query; saving it to history is a side effect. |
