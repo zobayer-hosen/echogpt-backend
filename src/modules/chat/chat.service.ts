@@ -186,6 +186,15 @@ export class ChatService {
     await this.conversations.softDelete({ id });
   }
 
+  /** Prompts sent today (UTC), for the admin dashboard. */
+  async countPromptsToday(): Promise<number> {
+    return this.messages
+      .createQueryBuilder('m')
+      .where('m.role = :role', { role: MessageRole.USER })
+      .andWhere('m.created_at >= CURRENT_DATE')
+      .getCount();
+  }
+
   /** Another user's (or a deleted) conversation is 404, never 403. */
   async findOwned(userId: string, id: string): Promise<Conversation> {
     const conversation = await this.conversations.findOne({

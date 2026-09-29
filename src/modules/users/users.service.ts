@@ -245,6 +245,20 @@ export class UsersService {
     await this.softDelete(await this.findByIdOrFail(userId));
   }
 
+  // ---- admin dashboard ----
+
+  async countStats(): Promise<{ total: number; newLast7Days: number }> {
+    const [row] = await this.users.query<
+      { total: number; new_last_7_days: number }[]
+    >(
+      `SELECT count(*)::int AS total,
+              (count(*) FILTER (WHERE created_at >= now() - interval '7 days'))::int AS new_last_7_days
+         FROM users
+        WHERE deleted_at IS NULL`,
+    );
+    return { total: row.total, newLast7Days: row.new_last_7_days };
+  }
+
   toProfile(user: User, plan: PlanCode): UserProfileDto {
     return {
       id: user.id,
