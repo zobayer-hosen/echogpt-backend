@@ -25,7 +25,10 @@ export class MockAdapter implements AiProviderAdapter {
     const started = Date.now();
     const prompt = [...messages].reverse().find((m) => m.role === 'user');
     const text = prompt?.content ?? '';
-    this.simulateFailures(text);
+    const failure = this.simulatedFailure(text);
+    if (failure) {
+      return Promise.reject(failure);
+    }
     const earlier = messages.length - 1;
     const content =
       `Mock AI (${this.config.model}) reply to: "${text.slice(0, 200)}".` +
@@ -36,7 +39,10 @@ export class MockAdapter implements AiProviderAdapter {
 
   search(query: string): Promise<SearchResult> {
     const started = Date.now();
-    this.simulateFailures(query);
+    const failure = this.simulatedFailure(query);
+    if (failure) {
+      return Promise.reject(failure);
+    }
     const slug = encodeURIComponent(
       query.trim().toLowerCase().replace(/\s+/g, '-'),
     );
@@ -55,9 +61,10 @@ export class MockAdapter implements AiProviderAdapter {
     return Promise.resolve({ ok: true, latencyMs: 0 });
   }
 
-  private simulateFailures(text: string): void {
+  /** Failures are returned as rejections, never thrown synchronously. */
+  private simulatedFailure(text: string): AppException | null {
     if (text.includes(MOCK_TIMEOUT_MARKER)) {
-      throw new AppException(
+      return new AppException(
         HttpStatus.GATEWAY_TIMEOUT,
         ErrorCode.PROVIDER_TIMEOUT,
         'Mock did not answer in time (simulated)',
@@ -65,12 +72,13 @@ export class MockAdapter implements AiProviderAdapter {
       );
     }
     if (text.includes(MOCK_ERROR_MARKER)) {
-      throw new AppException(
+      return new AppException(
         HttpStatus.BAD_GATEWAY,
         ErrorCode.PROVIDER_ERROR,
         'Mock returned an error (simulated)',
         { provider: 'Mock' },
       );
     }
+    return null;
   }
 }
