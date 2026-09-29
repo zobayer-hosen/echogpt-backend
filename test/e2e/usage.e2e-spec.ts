@@ -142,4 +142,57 @@ describe('Usage limits (e2e)', () => {
       code: 'USAGE_LIMIT_EXCEEDED',
     });
   });
+
+  describe('over HTTP (chat)', () => {
+    const chat = (user: TestUser) =>
+      t
+        .http()
+        .post(t.api('/chat/messages'))
+        .set(bearer(user.accessToken))
+        .send({ prompt: 'hello' });
+
+    it('T5: 21st FREE chat → 429 with limit details; after upgrade → allowed', async () => {
+      const user = await registerUser(t);
+      for (let i = 1; i <= 20; i++) {
+        const res = await chat(user).expect(201);
+        expect(res.body.usage.remaining).toBe(20 - i);
+      }
+
+      const blocked = await chat(user).expect(429);
+      expect(blocked.body).toMatchObject({
+        statusCode: 429,
+        code: 'USAGE_LIMIT_EXCEEDED',
+        message: 'Daily limit of 20 requests reached',
+        details: {
+          limit: 20,
+          used: 20,
+          remaining: 0,
+          resetsAt: nextUtcMidnight(),
+        },
+      });
+
+      await t
+        .http()
+        .post(t.api('/subscriptions/me/change'))
+        .set(bearer(user.accessToken))
+        .send({ plan: 'PREMIUM' })
+        .expect(200);
+      const allowed = await chat(user).expect(201);
+      expect(allowed.body.usage).toMatchObject({
+        plan: 'PREMIUM',
+        used: 21,
+        remaining: 479,
+      });
+    });
+
+    it('T6: concurrent chats at limit - 1 → exactly one 201', async () => {
+      const user = await registerUser(t);
+      await setUsed(user.id, 19);
+      const results = await Promise.all(
+        Array.from({ length: 5 }, () => chat(user)),
+      );
+      const statuses = results.map((r) => r.status).sort();
+      expect(statuses).toEqual([201, 429, 429, 429, 429]);
+    });
+  });
 });
