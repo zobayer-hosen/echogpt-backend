@@ -226,6 +226,22 @@ export class ProvidersService {
     return results;
   }
 
+  /** Saved health of every provider (no live calls), for admin views. */
+  async listHealth() {
+    const rows = await this.providers.find({
+      order: { isDefault: 'DESC', name: 'ASC' },
+    });
+    return rows.map((p) => ({
+      id: p.id,
+      name: p.name,
+      type: p.type,
+      isEnabled: p.isEnabled,
+      isDefault: p.isDefault,
+      healthStatus: p.healthStatus,
+      healthCheckedAt: p.healthCheckedAt,
+    }));
+  }
+
   private async check(provider: AiProvider): Promise<HealthCheckResultDto> {
     const health = await this.adapterFor(provider).healthCheck();
     const status = health.ok ? HealthStatus.UP : HealthStatus.DOWN;

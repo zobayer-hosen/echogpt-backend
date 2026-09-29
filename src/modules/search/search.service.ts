@@ -201,6 +201,14 @@ export class SearchService {
     return suggestions;
   }
 
+  /** Searches today (UTC, cached ones included), for the admin dashboard. */
+  countToday(): Promise<number> {
+    return this.searches
+      .createQueryBuilder('w')
+      .where('w.created_at >= CURRENT_DATE')
+      .getCount();
+  }
+
   /**
    * A real (non-cached) answer for the same normalized query and provider
    * within the TTL. Cached rows are skipped so the TTL can't be extended.

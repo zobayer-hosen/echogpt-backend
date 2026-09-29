@@ -241,6 +241,22 @@ export class SubscriptionsService {
     return this.getForAdmin(userId);
   }
 
+  /** Active (non-deleted) users per plan, for the admin dashboard. */
+  async countByPlan(): Promise<Record<PlanCode, number>> {
+    const rows = await this.subscriptions
+      .createQueryBuilder('s')
+      .innerJoin('s.user', 'u', 'u.deleted_at IS NULL')
+      .select('s.plan', 'plan')
+      .addSelect('count(*)::int', 'count')
+      .groupBy('s.plan')
+      .getRawMany<{ plan: PlanCode; count: number }>();
+    const counts = { [PlanCode.FREE]: 0, [PlanCode.PREMIUM]: 0 };
+    for (const row of rows) {
+      counts[row.plan] = row.count;
+    }
+    return counts;
+  }
+
   private async findOrFail(userId: string): Promise<Subscription> {
     const subscription = await this.subscriptions.findOne({
       where: { userId },
