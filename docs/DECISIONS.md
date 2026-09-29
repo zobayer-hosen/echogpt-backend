@@ -26,3 +26,7 @@ this file records choices made while building.
 | D19 | Login compares against a dummy bcrypt hash when the email is unknown. | Response time doesn't reveal whether an email is registered. |
 | D20 | The 5/min login limit is a second named throttler that only counts `POST /auth/login`. | The 60/min global limit stays separate; both are per IP. |
 | D21 | `register` runs `UsersService.create()` and `SubscriptionsService.createFree()` with one `EntityManager` in one transaction. | PRD AU-1 needs one transaction, while each table keeps one owning service. |
+| D22 | `@Roles()` bundles the metadata, `RolesGuard` and the Swagger lock; it is applied per controller, after the global JWT guard. | Guard order is guaranteed (global guards run first) and every admin route is documented as locked. |
+| D23 | `UsersModule` ↔ `AuthModule` use `forwardRef`. | Login needs users; password change, delete and suspend need to revoke sessions. There is no provider-level cycle. |
+| D24 | "Last admin" = the last **active** ADMIN; they can't be deleted, demoted or suspended (`409 LAST_ADMIN`). | PRD US-4 covers self-delete; the same rule for demote/suspend keeps the system manageable. |
+| D25 | Admin user lists read the plan through a join on `subscriptions` (read only). Writes to a table always go through its owning service. | One query for a filtered, paginated list; ownership of writes stays clear. |

@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
@@ -18,7 +18,7 @@ import { TokenService } from './token.service';
     PassportModule,
     // secrets and lifetimes are passed per call (access vs refresh)
     JwtModule.register({}),
-    UsersModule,
+    forwardRef(() => UsersModule),
     SubscriptionsModule,
   ],
   controllers: [AuthController],
