@@ -1,16 +1,25 @@
-import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
+import {
+  ExecutionContext,
+  MiddlewareConsumer,
+  Module,
+  NestModule,
+} from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import type { Request } from 'express';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { RequestLoggingInterceptor } from './common/interceptors/request-logging.interceptor';
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
 import configuration, { AppConfig } from './config/configuration';
 import { validateEnv } from './config/env.validation';
 import { buildDataSourceOptions } from './database/data-source';
+import { AuthModule } from './modules/auth/auth.module';
 import { HealthModule } from './modules/health/health.module';
 import { LoggingModule } from './modules/logging/logging.module';
+import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
+import { UsersModule } from './modules/users/users.module';
 
 @Module({
   imports: [
@@ -34,11 +43,26 @@ import { LoggingModule } from './modules/logging/logging.module';
             ttl: 60_000,
             limit: config.get('throttle.perMinute', { infer: true }),
           },
+          {
+            // stricter limit for password guessing, only on POST /auth/login
+            name: 'login',
+            ttl: 60_000,
+            limit: config.get('throttle.loginPerMinute', { infer: true }),
+            skipIf: (context: ExecutionContext) => {
+              const req = context.switchToHttp().getRequest<Request>();
+              return !(
+                req.method === 'POST' && req.path.endsWith('/auth/login')
+              );
+            },
+          },
         ],
       }),
     }),
     LoggingModule,
     HealthModule,
+    AuthModule,
+    UsersModule,
+    SubscriptionsModule,
   ],
   providers: [
     RequestLoggingInterceptor,
