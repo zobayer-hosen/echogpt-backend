@@ -22,3 +22,7 @@ this file records choices made while building.
 | D15 | `password_hash`, `refresh_token_hash`, `email_verify_token_hash` and `api_key_encrypted` are `select: false`. | Secrets are never loaded by accident; code that needs them asks explicitly. |
 | D16 | Roles have fixed ids (ADMIN = 1, USER = 2). Seeded model ids are the real API ids: `gpt-4o-mini`, `claude-haiku-4-5`, `gemini-flash-latest`. Demo users are seeded as email-verified. | Stable references in code; ERD's "claude-haiku"/"gemini-flash" aren't valid model ids. |
 | D17 | Request-log rows are written fire-and-forget and flushed before shutdown. | A log write must never slow down or fail a request. |
+| D18 | Access and refresh JWTs use different secrets and a `typ` claim; both carry `sid`. Refresh rotation is a compare-and-swap `UPDATE … WHERE refresh_token_hash = :old`. | A refresh token can't be used as an access token, and two concurrent uses of one refresh token can't both succeed. |
+| D19 | Login compares against a dummy bcrypt hash when the email is unknown. | Response time doesn't reveal whether an email is registered. |
+| D20 | The 5/min login limit is a second named throttler that only counts `POST /auth/login`. | The 60/min global limit stays separate; both are per IP. |
+| D21 | `register` runs `UsersService.create()` and `SubscriptionsService.createFree()` with one `EntityManager` in one transaction. | PRD AU-1 needs one transaction, while each table keeps one owning service. |
