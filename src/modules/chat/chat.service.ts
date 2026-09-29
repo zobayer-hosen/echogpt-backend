@@ -1,6 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { HttpStatus, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, Repository } from 'typeorm';
+import { ErrorCode } from '../../common/constants/error-codes';
 import { Paginated } from '../../common/dto/paginated-response.dto';
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 import { MessageRole } from '../../common/enums/message-role.enum';
@@ -24,6 +25,19 @@ import {
 } from './dto/chat.dto';
 import { ChatMessage } from './entities/chat-message.entity';
 import { Conversation } from './entities/conversation.entity';
+
+export type ChatStreamEvent =
+  | { event: 'token'; data: { text: string } }
+  | { event: 'done'; data: ChatReplyDto }
+  | { event: 'error'; data: { code: string; message: string } };
+
+/** Error frame for a failure after streaming started (no stack, no secrets). */
+function toStreamError(error: unknown): { code: string; message: string } {
+  if (error instanceof AppException) {
+    return { code: String(error.code), message: error.message };
+  }
+  return { code: ErrorCode.INTERNAL_ERROR, message: 'Internal server error' };
+}
 
 /** Messages sent to the provider as context (PRD CH-2). */
 export const HISTORY_SIZE = 20;
@@ -84,42 +98,14 @@ export class ChatService {
       success: true,
     });
 
-    const saved = await this.dataSource.transaction(async (m) => {
-      const conversation =
-        existing ?? (await this.createIn(m, userId, dto.prompt));
-      const title =
-        existing && existing.title === DEFAULT_TITLE && !history.length
-          ? conversationTitle(dto.prompt)
-          : conversation.title;
-      const userMessage = await m.save(
-        m.create(ChatMessage, {
-          conversationId: conversation.id,
-          role: MessageRole.USER,
-          content: dto.prompt,
-          providerId: null,
-          latencyMs: null,
-          createdAt: sentAt,
-        }),
-      );
-      const assistantMessage = await m.save(
-        m.create(ChatMessage, {
-          conversationId: conversation.id,
-          role: MessageRole.ASSISTANT,
-          content: answer.content,
-          providerId: provider.id,
-          latencyMs: answer.latencyMs,
-          createdAt: new Date(Math.max(Date.now(), sentAt.getTime() + 1)),
-        }),
-      );
-      // any UPDATE also sets updated_at, moving it to the top of the list
-      await m.update(Conversation, { id: conversation.id }, { title });
-      return {
-        conversation: await m.findOneByOrFail(Conversation, {
-          id: conversation.id,
-        }),
-        userMessage,
-        assistantMessage,
-      };
+    const saved = await this.saveExchange({
+      userId,
+      existing,
+      isFirstMessage: !history.length,
+      prompt: dto.prompt,
+      sentAt,
+      providerId: provider.id,
+      answer,
     });
 
     return {
@@ -128,6 +114,83 @@ export class ChatService {
       assistantMessage: this.toMessage(saved.assistantMessage),
       usage,
     };
+  }
+
+  /**
+   * Streaming variant (PRD CH-5). Ownership, provider and usage are checked
+   * first, so those errors are normal JSON responses. The returned events are
+   * then streamed: `token` pieces, and `done` after both messages are saved,
+   * or `error` (request given back, nothing saved). If the client
+   * disconnects, the provider call stops and nothing is saved.
+   */
+  async streamMessage(
+    userId: string,
+    conversationId: string,
+    dto: SendMessageDto,
+    signal: AbortSignal,
+  ): Promise<AsyncGenerator<ChatStreamEvent>> {
+    const existing = await this.findOwned(userId, conversationId);
+    const { provider, adapter } = await this.providers.resolveForUse(
+      dto.providerId,
+    );
+    const usage = await this.subscriptions.useRequest(userId);
+    const history = await this.history(existing.id);
+    const sentAt = new Date();
+    const logCall = (success: boolean) =>
+      RequestContext.setAiCall({
+        feature: UsageFeature.CHAT,
+        providerId: provider.id,
+        success,
+      });
+
+    return async function* (this: ChatService) {
+      let content = '';
+      try {
+        const turns: ChatTurn[] = [
+          ...history,
+          { role: 'user', content: dto.prompt },
+        ];
+        for await (const text of adapter.chatStream(turns, signal)) {
+          content += text;
+          yield { event: 'token', data: { text } } as const;
+        }
+        if (!content) {
+          throw new AppException(
+            HttpStatus.BAD_GATEWAY,
+            ErrorCode.PROVIDER_ERROR,
+            `${provider.name} returned an empty answer`,
+          );
+        }
+      } catch (error) {
+        logCall(false);
+        if (signal.aborted) {
+          return; // the client left; nothing to send or save
+        }
+        await this.subscriptions.giveBackRequest(userId);
+        yield { event: 'error', data: toStreamError(error) } as const;
+        return;
+      }
+      logCall(true);
+
+      const saved = await this.saveExchange({
+        userId,
+        existing,
+        isFirstMessage: !history.length,
+        prompt: dto.prompt,
+        sentAt,
+        providerId: provider.id,
+        answer: { content, latencyMs: Date.now() - sentAt.getTime() },
+      });
+      yield {
+        event: 'done',
+        data: {
+          conversation: this.toConversation(saved.conversation),
+          userMessage: this.toMessage(saved.userMessage),
+          assistantMessage: this.toMessage(saved.assistantMessage),
+          usage,
+        },
+      } as const;
+    }.call(this);
   }
 
   async create(userId: string, title?: string): Promise<ConversationDto> {
@@ -219,6 +282,56 @@ export class ChatService {
       role: m.role === MessageRole.USER ? 'user' : 'assistant',
       content: m.content,
     }));
+  }
+
+  /** USER + ASSISTANT messages in one transaction (PRD §9 data integrity). */
+  private saveExchange(input: {
+    userId: string;
+    existing: Conversation | null;
+    isFirstMessage: boolean;
+    prompt: string;
+    sentAt: Date;
+    providerId: string;
+    answer: ChatResult;
+  }) {
+    const { existing, prompt, sentAt, answer } = input;
+    return this.dataSource.transaction(async (m) => {
+      const conversation =
+        existing ?? (await this.createIn(m, input.userId, prompt));
+      const title =
+        existing && existing.title === DEFAULT_TITLE && input.isFirstMessage
+          ? conversationTitle(prompt)
+          : conversation.title;
+      const userMessage = await m.save(
+        m.create(ChatMessage, {
+          conversationId: conversation.id,
+          role: MessageRole.USER,
+          content: prompt,
+          providerId: null,
+          latencyMs: null,
+          createdAt: sentAt,
+        }),
+      );
+      const assistantMessage = await m.save(
+        m.create(ChatMessage, {
+          conversationId: conversation.id,
+          role: MessageRole.ASSISTANT,
+          content: answer.content,
+          providerId: input.providerId,
+          latencyMs: answer.latencyMs,
+          createdAt: new Date(Math.max(Date.now(), sentAt.getTime() + 1)),
+        }),
+      );
+      // any UPDATE also sets updated_at, moving it to the top of the list
+      await m.update(Conversation, { id: conversation.id }, { title });
+      return {
+        conversation: await m.findOneByOrFail(Conversation, {
+          id: conversation.id,
+        }),
+        userMessage,
+        assistantMessage,
+      };
+    });
   }
 
   private createIn(
