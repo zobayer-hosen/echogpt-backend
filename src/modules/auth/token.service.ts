@@ -18,6 +18,8 @@ export interface AccessTokenPayload {
   sid: string;
   role: RoleName;
   typ: 'access';
+  /** unique per token, so each issue yields a new token */
+  jti: string;
 }
 
 interface RefreshTokenPayload {
@@ -192,6 +194,7 @@ export class TokenService {
       sid,
       role: user.role,
       typ: 'access',
+      jti: randomUUID(),
     };
     return this.jwt.signAsync(payload, {
       secret: this.jwtConfig.accessSecret,
