@@ -275,9 +275,10 @@ Keys are encrypted with AES-256-GCM (`ENCRYPTION_KEY`), never returned (only `ap
 **Streaming:** `POST /chat/conversations/:id/messages/stream` answers with Server-Sent Events. Try it with `curl -N`:
 
 ```bash
-curl -N -X POST $BASE/chat/conversations/<id>/messages/stream   -H "Authorization: Bearer $TOKEN" -H 'content-type: application/json' -d '{"prompt":"Tell me a story"}'
+curl -N -X POST $BASE/chat/conversations/<id>/messages/stream \
+  -H "Authorization: Bearer $TOKEN" -H 'content-type: application/json' \
+  -d '{"prompt":"Tell me a story"}'
 ```
-
 
 ## Tests
 
