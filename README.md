@@ -224,6 +224,7 @@ Or in Swagger: `POST /auth/login` → **Authorize** → paste the `accessToken` 
 | Subscriptions | `GET /subscriptions/me` · `POST /subscriptions/me/change` · `GET /subscriptions/me/usage` | 🔑 |
 | Providers | `GET /providers` | 🔑 |
 | Chat | `POST /chat/messages` · `POST` · `GET /chat/conversations` · `GET` · `PATCH` · `DELETE /chat/conversations/:id` · `POST /chat/conversations/:id/messages` | 🔑 |
+| | `POST /chat/conversations/:id/messages/stream` (SSE: `token` events, then `done`) | 🔑 |
 | Search | `POST /search` · `GET` · `DELETE /search/history` · `DELETE /search/history/:id` · `GET /search/recent` · `GET /search/suggestions?q=` | 🔑 |
 | Admin | `GET /admin/dashboard` · `GET /admin/health` · `GET /admin/analytics/usage` · `GET /admin/logs/requests` | 👑 |
 | | `GET /admin/users` · `GET` · `PATCH` · `DELETE /admin/users/:id` | 👑 |
@@ -270,6 +271,13 @@ Every error has the same shape:
 Keys are encrypted with AES-256-GCM (`ENCRYPTION_KEY`), never returned (only `apiKeyMasked`, e.g. `••••a1b2`) and never logged. Users choose a provider with `providerId` from `GET /providers`, or omit it to use the default.
 
 **Mock provider:** put `[mock-error]` or `[mock-timeout]` in a prompt or query to see `502` / `504` handling (and that the request is not counted).
+
+**Streaming:** `POST /chat/conversations/:id/messages/stream` answers with Server-Sent Events. Try it with `curl -N`:
+
+```bash
+curl -N -X POST $BASE/chat/conversations/<id>/messages/stream   -H "Authorization: Bearer $TOKEN" -H 'content-type: application/json' -d '{"prompt":"Tell me a story"}'
+```
+
 
 ## Tests
 

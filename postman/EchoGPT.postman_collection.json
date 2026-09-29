@@ -813,6 +813,47 @@
               }
             }
           }
+        },
+        {
+          "name": "Send a prompt and stream the answer (SSE)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/chat/conversations/:id/messages/stream",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "chat",
+                "conversations",
+                ":id",
+                "messages",
+                "stream"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{conversationId}}"
+                }
+              ]
+            },
+            "description": "Send a prompt and stream the answer (SSE)\n\nSame rules as the non-streaming endpoint, answered as `text/event-stream`:\n\n- `event: token` / `data: {\"text\": \"...\"}` for each piece of the answer\n- `event: done` / `data: {conversation, userMessage, assistantMessage, usage}` once both messages are saved\n- `event: error` / `data: {code, message}` if the provider fails after streaming started (the request is given back, nothing is saved)\n\nErrors before streaming starts (validation, auth, not found, disabled provider, usage limit) are normal JSON error responses. If the client disconnects, the provider call stops and nothing is saved.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"prompt\": \"Tell me a short story.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
         }
       ]
     },
