@@ -111,7 +111,7 @@ export class SubscriptionsService {
       })
       .where('user_id = :userId', { userId })
       .andWhere(
-        `(usage_date <> CURRENT_DATE OR requests_used < CASE plan WHEN 'PREMIUM' THEN :premiumLimit ELSE :freeLimit END)`,
+        `(usage_date <> CURRENT_DATE OR requests_used < CASE plan WHEN 'PREMIUM' THEN CAST(:premiumLimit AS int) ELSE CAST(:freeLimit AS int) END)`,
         {
           freeLimit: this.limitFor(PlanCode.FREE),
           premiumLimit: this.limitFor(PlanCode.PREMIUM),
