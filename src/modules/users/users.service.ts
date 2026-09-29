@@ -135,7 +135,7 @@ export class UsersService {
       .andWhere(
         `(email_verify_expires_at IS NULL OR email_verify_expires_at - make_interval(hours => ${EMAIL_TOKEN_TTL_HOURS}) <= now() - make_interval(secs => ${EMAIL_RESEND_COOLDOWN_SECONDS}))`,
       )
-      .returning(['email_verify_expires_at'])
+      .returning('email_verify_expires_at')
       .execute();
     const [row] = result.raw as { email_verify_expires_at: Date }[];
     if (row) {
