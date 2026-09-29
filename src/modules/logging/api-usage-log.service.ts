@@ -1,6 +1,8 @@
 import { BeforeApplicationShutdown, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { UsageFeature } from '../../common/enums/usage-feature.enum';
+import { RequestContext } from '../../common/utils/request-context';
 import { ApiUsageLog } from './entities/api-usage-log.entity';
 
 export type ApiUsageLogEntry = Pick<
@@ -44,6 +46,31 @@ export class ApiUsageLogService implements BeforeApplicationShutdown {
       })
       .finally(() => this.pending.delete(write));
     this.pending.add(write);
+  }
+
+  /**
+   * Extra row for an AI call that is not the request's own single AI call
+   * (e.g. one row per provider in "check all providers").
+   */
+  recordAiCall(call: {
+    userId: string | null;
+    feature: UsageFeature;
+    providerId: string;
+    success: boolean;
+    durationMs: number;
+  }): void {
+    const store = RequestContext.get();
+    this.record({
+      userId: call.userId,
+      method: store?.method ?? 'INTERNAL',
+      path: store?.path ?? '-',
+      statusCode: 200,
+      durationMs: call.durationMs,
+      ipAddress: store?.ip ?? null,
+      feature: call.feature,
+      providerId: call.providerId,
+      aiSuccess: call.success,
+    });
   }
 
   /** Waits for writes still in flight (used on shutdown and in tests). */

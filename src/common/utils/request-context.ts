@@ -12,6 +12,10 @@ export interface AiCallInfo {
 export interface RequestStore {
   requestId: string;
   startedAt: number;
+  method: string;
+  /** path without the query string */
+  path: string;
+  ip: string | null;
   ai?: AiCallInfo;
 }
 

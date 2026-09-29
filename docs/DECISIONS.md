@@ -33,3 +33,9 @@ this file records choices made while building.
 | D26 | `useRequest()` picks the limit inside the atomic UPDATE (`CASE plan WHEN 'PREMIUM' …`) and returns usage with `RETURNING`. | Check and count stay one statement even if the plan changes at the same moment; no extra read on the happy path. |
 | D27 | `resetsAt` is computed by Postgres (`(CURRENT_DATE + 1)::timestamptz`, UTC session). | The reset time always matches the day the counter uses, even around midnight. |
 | D28 | `GET /plans` also returns `currency` and `billingPeriod`. | Clients can render prices without guessing; PRD SU-1 fields are all there. |
+| D29 | Health checks read the model (`GET …/models/{model}`) instead of generating text. | Still a real authenticated call that proves key + model, but free and fast. |
+| D30 | Adapters never echo provider error bodies; errors carry only the provider name and HTTP status. Gemini's key goes in the `x-goog-api-key` header, not the URL. | Some providers put parts of the key in error messages; URLs end up in logs. |
+| D31 | The Mock adapter fails on purpose when a prompt/query contains `[mock-error]` or `[mock-timeout]`. | Lets tests and demos show 502/504 handling and quota give-back without a paid key. |
+| D32 | A non-MOCK provider can exist without a key only while disabled; it needs a key before it can be enabled. New `409 PROVIDER_NAME_TAKEN` for duplicate names. | Seeded OpenAI/Claude/Gemini start disabled with no key (ERD §6); an enabled provider must work. PRD §7 has no code for a duplicate provider name. |
+| D33 | `GET /providers` returns a plain array; `GET /admin/providers` is paginated. | The user list is a short, fixed-size dropdown; the admin list follows the list convention. |
+| D34 | "Check all providers" writes one `api_usage_logs` row per provider (feature `HEALTH_CHECK`) besides the request row. | "Every AI call logged" (PRD goal 6) with per-provider success for analytics. |

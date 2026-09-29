@@ -18,6 +18,7 @@ import { buildDataSourceOptions } from './database/data-source';
 import { AuthModule } from './modules/auth/auth.module';
 import { HealthModule } from './modules/health/health.module';
 import { LoggingModule } from './modules/logging/logging.module';
+import { ProvidersModule } from './modules/providers/providers.module';
 import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
 import { UsersModule } from './modules/users/users.module';
 
@@ -63,6 +64,7 @@ import { UsersModule } from './modules/users/users.module';
     AuthModule,
     UsersModule,
     SubscriptionsModule,
+    ProvidersModule,
   ],
   providers: [
     RequestLoggingInterceptor,
