@@ -1,9 +1,10 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import type { Request } from 'express';
+import { UsageFeature } from '../enums/usage-feature.enum';
 
 /** Info about the AI call made while serving a request (for api_usage_logs). */
 export interface AiCallInfo {
-  feature: string;
+  feature: UsageFeature;
   providerId: string | null;
   success: boolean;
 }

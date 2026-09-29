@@ -8,7 +8,9 @@ import { RequestLoggingInterceptor } from './common/interceptors/request-logging
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
 import configuration, { AppConfig } from './config/configuration';
 import { validateEnv } from './config/env.validation';
+import { buildDataSourceOptions } from './database/data-source';
 import { HealthModule } from './modules/health/health.module';
+import { LoggingModule } from './modules/logging/logging.module';
 
 @Module({
   imports: [
@@ -20,14 +22,8 @@ import { HealthModule } from './modules/health/health.module';
     }),
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
-      useFactory: (config: ConfigService<AppConfig, true>) => ({
-        type: 'postgres' as const,
-        url: config.get('db.url', { infer: true }),
-        autoLoadEntities: true,
-        synchronize: false,
-        // counters and "today" are per UTC day
-        extra: { options: '-c timezone=UTC' },
-      }),
+      useFactory: (config: ConfigService<AppConfig, true>) =>
+        buildDataSourceOptions(config.get('db.url', { infer: true })),
     }),
     ThrottlerModule.forRootAsync({
       inject: [ConfigService],
@@ -41,6 +37,7 @@ import { HealthModule } from './modules/health/health.module';
         ],
       }),
     }),
+    LoggingModule,
     HealthModule,
   ],
   providers: [
