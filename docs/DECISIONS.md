@@ -30,3 +30,6 @@ this file records choices made while building.
 | D23 | `UsersModule` ↔ `AuthModule` use `forwardRef`. | Login needs users; password change, delete and suspend need to revoke sessions. There is no provider-level cycle. |
 | D24 | "Last admin" = the last **active** ADMIN; they can't be deleted, demoted or suspended (`409 LAST_ADMIN`). | PRD US-4 covers self-delete; the same rule for demote/suspend keeps the system manageable. |
 | D25 | Admin user lists read the plan through a join on `subscriptions` (read only). Writes to a table always go through its owning service. | One query for a filtered, paginated list; ownership of writes stays clear. |
+| D26 | `useRequest()` picks the limit inside the atomic UPDATE (`CASE plan WHEN 'PREMIUM' …`) and returns usage with `RETURNING`. | Check and count stay one statement even if the plan changes at the same moment; no extra read on the happy path. |
+| D27 | `resetsAt` is computed by Postgres (`(CURRENT_DATE + 1)::timestamptz`, UTC session). | The reset time always matches the day the counter uses, even around midnight. |
+| D28 | `GET /plans` also returns `currency` and `billingPeriod`. | Clients can render prices without guessing; PRD SU-1 fields are all there. |
