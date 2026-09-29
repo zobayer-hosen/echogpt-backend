@@ -14,6 +14,10 @@ import {
 export const MOCK_ERROR_MARKER = '[mock-error]';
 export const MOCK_TIMEOUT_MARKER = '[mock-timeout]';
 
+/** Pause between streamed words, so streaming is visible in a client. */
+const STREAM_DELAY_MS = 15;
+const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 /**
  * Free, offline provider (PRD A1): deterministic answers, no key, no network.
  * Seeded as the default so the whole API works out of the box.
@@ -23,18 +27,37 @@ export class MockAdapter implements AiProviderAdapter {
 
   chat(messages: ChatTurn[]): Promise<ChatResult> {
     const started = Date.now();
-    const prompt = [...messages].reverse().find((m) => m.role === 'user');
-    const text = prompt?.content ?? '';
-    const failure = this.simulatedFailure(text);
+    const failure = this.simulatedFailure(lastPrompt(messages));
     if (failure) {
       return Promise.reject(failure);
     }
-    const earlier = messages.length - 1;
-    const content =
-      `Mock AI (${this.config.model}) reply to: "${text.slice(0, 200)}".` +
-      (earlier > 0 ? ` I can see ${earlier} earlier message(s).` : '') +
-      ' Add an OpenAI, Anthropic or Gemini key in the admin panel for real answers.';
-    return Promise.resolve({ content, latencyMs: Date.now() - started });
+    return Promise.resolve({
+      content: this.reply(messages),
+      latencyMs: Date.now() - started,
+    });
+  }
+
+  /** Streams the chat() answer word by word; `[mock-error]` fails after 2 words. */
+  async *chatStream(
+    messages: ChatTurn[],
+    signal?: AbortSignal,
+  ): AsyncGenerator<string> {
+    const prompt = lastPrompt(messages);
+    const failure = this.simulatedFailure(prompt);
+    if (failure && prompt.includes(MOCK_TIMEOUT_MARKER)) {
+      throw failure;
+    }
+    const words = this.reply(messages).split(/(?<= )/);
+    for (const [index, word] of words.entries()) {
+      if (failure && index === 2) {
+        throw failure;
+      }
+      await pause(STREAM_DELAY_MS);
+      if (signal?.aborted) {
+        throw new DOMException('The caller aborted the stream', 'AbortError');
+      }
+      yield word;
+    }
   }
 
   search(query: string): Promise<SearchResult> {
@@ -61,6 +84,15 @@ export class MockAdapter implements AiProviderAdapter {
     return Promise.resolve({ ok: true, latencyMs: 0 });
   }
 
+  private reply(messages: ChatTurn[]): string {
+    const earlier = messages.length - 1;
+    return (
+      `Mock AI (${this.config.model}) reply to: "${lastPrompt(messages).slice(0, 200)}".` +
+      (earlier > 0 ? ` I can see ${earlier} earlier message(s).` : '') +
+      ' Add an OpenAI, Anthropic or Gemini key in the admin panel for real answers.'
+    );
+  }
+
   /** Failures are returned as rejections, never thrown synchronously. */
   private simulatedFailure(text: string): AppException | null {
     if (text.includes(MOCK_TIMEOUT_MARKER)) {
@@ -81,4 +113,8 @@ export class MockAdapter implements AiProviderAdapter {
     }
     return null;
   }
+}
+
+function lastPrompt(messages: ChatTurn[]): string {
+  return [...messages].reverse().find((m) => m.role === 'user')?.content ?? '';
 }

@@ -20,13 +20,7 @@ export class GeminiAdapter extends BaseAdapter {
       {
         method: 'POST',
         headers: this.headers(),
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: system }] },
-          contents: messages.map((m) => ({
-            role: m.role === 'assistant' ? 'model' : 'user',
-            parts: [{ text: m.content }],
-          })),
-        }),
+        body: JSON.stringify(this.body(messages, system)),
       },
     );
     const text = (body.candidates?.[0]?.content?.parts ?? [])
@@ -38,12 +32,47 @@ export class GeminiAdapter extends BaseAdapter {
     return text;
   }
 
+  protected async *streamComplete(
+    messages: ChatTurn[],
+    system: string,
+    signal: AbortSignal,
+  ): AsyncGenerator<string> {
+    const events = this.streamEvents(
+      `${this.modelUrl()}:streamGenerateContent?alt=sse`,
+      {
+        method: 'POST',
+        headers: this.headers(),
+        body: JSON.stringify(this.body(messages, system)),
+      },
+      signal,
+    );
+    for await (const event of events) {
+      const chunk = this.parseJson<GenerateContentResponse>(event.data);
+      const text = (chunk.candidates?.[0]?.content?.parts ?? [])
+        .map((part) => part.text ?? '')
+        .join('');
+      if (text) {
+        yield text;
+      }
+    }
+  }
+
   /** Reads the model; fails on a bad key or unknown model. */
   protected async ping(): Promise<void> {
     await this.send(this.modelUrl(), {
       method: 'GET',
       headers: this.headers(),
     });
+  }
+
+  private body(messages: ChatTurn[], system: string) {
+    return {
+      systemInstruction: { parts: [{ text: system }] },
+      contents: messages.map((m) => ({
+        role: m.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: m.content }],
+      })),
+    };
   }
 
   private modelUrl(): string {

@@ -38,6 +38,12 @@ export interface AiProviderAdapter {
   /** Answer the last user turn, using the earlier turns as context. */
   chat(messages: ChatTurn[]): Promise<ChatResult>;
 
+  /**
+   * Same as chat(), but yields the answer in pieces as the provider sends
+   * them (PRD CH-5). Aborting `signal` stops the provider call.
+   */
+  chatStream(messages: ChatTurn[], signal?: AbortSignal): AsyncIterable<string>;
+
   /** AI-assisted web search: short answer + list of {title, url, snippet}. */
   search(query: string): Promise<SearchResult>;
 

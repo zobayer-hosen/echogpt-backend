@@ -7,6 +7,10 @@ interface ChatCompletionResponse {
   choices?: { message?: { content?: string | null } }[];
 }
 
+interface ChatCompletionChunk {
+  choices?: { delta?: { content?: string | null } }[];
+}
+
 /** OpenAI Chat Completions API. */
 export class OpenAiAdapter extends BaseAdapter {
   protected readonly label = 'OpenAI';
@@ -31,6 +35,36 @@ export class OpenAiAdapter extends BaseAdapter {
       throw this.emptyAnswer();
     }
     return content;
+  }
+
+  protected async *streamComplete(
+    messages: ChatTurn[],
+    system: string,
+    signal: AbortSignal,
+  ): AsyncGenerator<string> {
+    const events = this.streamEvents(
+      `${BASE_URL}/chat/completions`,
+      {
+        method: 'POST',
+        headers: this.headers(),
+        body: JSON.stringify({
+          model: this.config.model,
+          messages: [{ role: 'system', content: system }, ...messages],
+          stream: true,
+        }),
+      },
+      signal,
+    );
+    for await (const event of events) {
+      if (event.data === '[DONE]') {
+        return;
+      }
+      const chunk = this.parseJson<ChatCompletionChunk>(event.data);
+      const text = chunk.choices?.[0]?.delta?.content;
+      if (text) {
+        yield text;
+      }
+    }
   }
 
   /** Reads the model; free, and fails on a bad key or unknown model. */
