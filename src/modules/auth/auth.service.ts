@@ -7,11 +7,22 @@ import { PlanCode } from '../../common/enums/plan-code.enum';
 import { UserStatus } from '../../common/enums/user-status.enum';
 import { AppException } from '../../common/exceptions/app.exception';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
-import { BCRYPT_ROUNDS, UsersService } from '../users/users.service';
+import { randomToken, sha256 } from '../../common/utils/crypto.util';
+import {
+  BCRYPT_ROUNDS,
+  EMAIL_TOKEN_TTL_HOURS,
+  UsersService,
+} from '../users/users.service';
 import { AuthResponseDto, AuthTokensDto } from './dto/auth-response.dto';
 import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RegisterDto } from './dto/register.dto';
+import {
+  ResendVerificationResponseDto,
+  VerifyEmailDto,
+  VerifyEmailResponseDto,
+} from './dto/verify-email.dto';
+import { MailService } from './mail.service';
 import { SessionMeta, TokenService } from './token.service';
 
 /** Compared against when the email is unknown, so timing doesn't reveal it. */
@@ -26,6 +37,7 @@ export class AuthService {
     private readonly users: UsersService,
     private readonly subscriptions: SubscriptionsService,
     private readonly tokens: TokenService,
+    private readonly mail: MailService,
   ) {}
 
   /** User + FREE subscription in one transaction (PRD AU-1), then a session. */
@@ -37,10 +49,20 @@ export class AuthService {
       throw this.emailTaken();
     }
 
+    const verifyToken = randomToken();
+    const verifyExpiresAt = new Date(
+      Date.now() + EMAIL_TOKEN_TTL_HOURS * 3600 * 1000,
+    );
     let userId: string;
     try {
       userId = await this.dataSource.transaction(async (manager) => {
-        const user = await this.users.create(manager, dto);
+        const user = await this.users.create(manager, {
+          ...dto,
+          emailVerification: {
+            tokenHash: sha256(verifyToken),
+            expiresAt: verifyExpiresAt,
+          },
+        });
         await this.subscriptions.createFree(manager, user.id);
         return user.id;
       });
@@ -54,6 +76,8 @@ export class AuthService {
       }
       throw error;
     }
+
+    this.mail.sendVerificationEmail(dto.email, verifyToken, verifyExpiresAt);
 
     const user = await this.users.findByIdOrFail(userId);
     const tokens = await this.tokens.createSession(
@@ -103,6 +127,44 @@ export class AuthService {
 
   async logoutAll(user: AuthUser): Promise<void> {
     await this.tokens.revokeAllForUser(user.id);
+  }
+
+  /** One-time token from the email → verified (PRD AU-7). Not required to use the API. */
+  async verifyEmail(dto: VerifyEmailDto): Promise<VerifyEmailResponseDto> {
+    const email = await this.users.verifyEmail(sha256(dto.token));
+    if (!email) {
+      throw new AppException(
+        HttpStatus.BAD_REQUEST,
+        ErrorCode.EMAIL_TOKEN_INVALID,
+        'Verification token is invalid, expired or already used',
+      );
+    }
+    return { email, isEmailVerified: true };
+  }
+
+  /** New token and email, at most once per minute; the old token stops working. */
+  async resendVerification(
+    user: AuthUser,
+  ): Promise<ResendVerificationResponseDto> {
+    const token = randomToken();
+    const result = await this.users.replaceEmailToken(user.id, sha256(token));
+    if ('refused' in result) {
+      if (result.refused === 'ALREADY_VERIFIED') {
+        throw new AppException(
+          HttpStatus.CONFLICT,
+          ErrorCode.EMAIL_ALREADY_VERIFIED,
+          'This email is already verified',
+        );
+      }
+      throw new AppException(
+        HttpStatus.TOO_MANY_REQUESTS,
+        ErrorCode.RATE_LIMITED,
+        'A verification email was sent less than a minute ago',
+        { retryAfterSeconds: result.retryAfterSeconds },
+      );
+    }
+    this.mail.sendVerificationEmail(user.email, token, result.expiresAt);
+    return { email: user.email, expiresAt: result.expiresAt };
   }
 
   private emailTaken(): AppException {

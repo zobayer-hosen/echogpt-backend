@@ -7,6 +7,7 @@ import {
   Req,
 } from '@nestjs/common';
 import {
+  ApiAcceptedResponse,
   ApiBearerAuth,
   ApiCreatedResponse,
   ApiNoContentResponse,
@@ -29,6 +30,11 @@ import { AuthResponseDto, AuthTokensDto } from './dto/auth-response.dto';
 import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RegisterDto } from './dto/register.dto';
+import {
+  ResendVerificationResponseDto,
+  VerifyEmailDto,
+  VerifyEmailResponseDto,
+} from './dto/verify-email.dto';
 import { SessionMeta } from './token.service';
 
 const sessionMeta = (req: Request): SessionMeta => ({
@@ -157,6 +163,67 @@ export class AuthController {
   )
   refresh(@Body() dto: RefreshTokenDto): Promise<AuthTokensDto> {
     return this.auth.refresh(dto);
+  }
+
+  @Public()
+  @Post('verify-email')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Verify email (bonus)',
+    description:
+      'Uses the one-time token sent at registration (valid 24 h). In development the email is printed to the server console. Verification is not required to use the API.',
+  })
+  @ApiOkResponse({
+    type: VerifyEmailResponseDto,
+    example: { email: 'carol@example.com', isEmailVerified: true },
+  })
+  @ApiErrorResponses(
+    ApiError.validation({
+      token: ['token must be longer than or equal to 20 characters'],
+    }),
+    ApiError.custom(
+      400,
+      ErrorCode.EMAIL_TOKEN_INVALID,
+      'Verification token is invalid, expired or already used',
+    ),
+  )
+  verifyEmail(@Body() dto: VerifyEmailDto): Promise<VerifyEmailResponseDto> {
+    return this.auth.verifyEmail(dto);
+  }
+
+  @Post('resend-verification')
+  @HttpCode(HttpStatus.ACCEPTED)
+  @ApiBearerAuth(BEARER_AUTH)
+  @ApiOperation({
+    summary: 'Resend the verification email (bonus)',
+    description:
+      'Sends a new token; the previous one stops working. At most once per minute.',
+  })
+  @ApiAcceptedResponse({
+    type: ResendVerificationResponseDto,
+    example: {
+      email: 'carol@example.com',
+      expiresAt: '2026-09-30T10:15:00.000Z',
+    },
+  })
+  @ApiErrorResponses(
+    ApiError.unauthorized,
+    ApiError.custom(
+      409,
+      ErrorCode.EMAIL_ALREADY_VERIFIED,
+      'This email is already verified',
+    ),
+    ApiError.custom(
+      429,
+      ErrorCode.RATE_LIMITED,
+      'A verification email was sent less than a minute ago',
+      { retryAfterSeconds: 42 },
+    ),
+  )
+  resendVerification(
+    @CurrentUser() user: AuthUser,
+  ): Promise<ResendVerificationResponseDto> {
+    return this.auth.resendVerification(user);
   }
 
   @Post('logout')

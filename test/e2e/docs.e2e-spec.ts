@@ -53,6 +53,8 @@ const PRD_ENDPOINTS = [
   'POST /chat/conversations/{id}/messages',
   // bonus
   'POST /chat/conversations/{id}/messages/stream',
+  'POST /auth/verify-email',
+  'POST /auth/resend-verification',
   'POST /search',
   'GET /search/history',
   'DELETE /search/history',

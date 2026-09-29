@@ -217,8 +217,8 @@ Or in Swagger: `POST /auth/login` → **Authorize** → paste the `accessToken` 
 | Area | Endpoints | Auth |
 |---|---|---|
 | Health | `GET /health` | 🔓 |
-| Auth | `POST /auth/register` · `/login` · `/refresh` | 🔓 |
-| | `POST /auth/logout` · `/logout-all` | 🔑 |
+| Auth | `POST /auth/register` · `/login` · `/refresh` · `/verify-email` | 🔓 |
+| | `POST /auth/logout` · `/logout-all` · `/resend-verification` | 🔑 |
 | Users | `GET` · `PATCH` · `DELETE /users/me` · `PATCH /users/me/password` | 🔑 |
 | Plans | `GET /plans` | 🔓 |
 | Subscriptions | `GET /subscriptions/me` · `POST /subscriptions/me/change` · `GET /subscriptions/me/usage` | 🔑 |
@@ -253,11 +253,11 @@ Every error has the same shape:
 
 | HTTP | Codes |
 |---|---|
-| 400 | `VALIDATION_ERROR` (fields in `details`) |
+| 400 | `VALIDATION_ERROR` (fields in `details`), `EMAIL_TOKEN_INVALID` |
 | 401 | `UNAUTHORIZED`, `INVALID_CREDENTIALS`, `REFRESH_TOKEN_INVALID`, `REFRESH_TOKEN_REUSED` |
 | 403 | `FORBIDDEN`, `ACCOUNT_DISABLED` |
 | 404 | `NOT_FOUND` |
-| 409 | `EMAIL_TAKEN`, `ALREADY_ON_PLAN`, `PROVIDER_IS_DEFAULT`, `PROVIDER_DISABLED`, `PROVIDER_NAME_TAKEN`, `LAST_ADMIN` |
+| 409 | `EMAIL_TAKEN`, `ALREADY_ON_PLAN`, `PROVIDER_IS_DEFAULT`, `PROVIDER_DISABLED`, `PROVIDER_NAME_TAKEN`, `EMAIL_ALREADY_VERIFIED`, `LAST_ADMIN` |
 | 429 | `USAGE_LIMIT_EXCEEDED`, `RATE_LIMITED` |
 | 500 / 502 / 504 | `INTERNAL_ERROR` (no stack trace), `PROVIDER_ERROR`, `PROVIDER_TIMEOUT` |
 
@@ -271,6 +271,8 @@ Every error has the same shape:
 Keys are encrypted with AES-256-GCM (`ENCRYPTION_KEY`), never returned (only `apiKeyMasked`, e.g. `••••a1b2`) and never logged. Users choose a provider with `providerId` from `GET /providers`, or omit it to use the default.
 
 **Mock provider:** put `[mock-error]` or `[mock-timeout]` in a prompt or query to see `502` / `504` handling (and that the request is not counted).
+
+**Email verification (bonus):** registering creates a one-time token (stored hashed, valid 24 h). In development the "email" is printed to the server console as a `[Mail]` log line; send the token to `POST /auth/verify-email`. `POST /auth/resend-verification` sends a new one (at most once per minute). Verification is not required to use the API.
 
 **Streaming:** `POST /chat/conversations/:id/messages/stream` answers with Server-Sent Events. Try it with `curl -N`:
 

@@ -35,7 +35,13 @@ export interface NewUser {
   password: string;
   fullName: string;
   role?: RoleName;
+  /** hashed one-time email-verification token (PRD AU-7) */
+  emailVerification?: { tokenHash: string; expiresAt: Date };
 }
+
+/** One resend per minute; a token lives 24 h (PRD AU-7). */
+export const EMAIL_TOKEN_TTL_HOURS = 24;
+export const EMAIL_RESEND_COOLDOWN_SECONDS = 60;
 
 const invalidPassword = () =>
   new AppException(
@@ -74,8 +80,84 @@ export class UsersService {
       passwordHash: await this.hashPassword(data.password),
       fullName: data.fullName,
       roleId: ROLE_IDS[data.role ?? RoleName.USER],
+      emailVerifyTokenHash: data.emailVerification?.tokenHash ?? null,
+      emailVerifyExpiresAt: data.emailVerification?.expiresAt ?? null,
     });
     return manager.save(user);
+  }
+
+  // ---- email verification (bonus, PRD AU-7) ----
+
+  /**
+   * Marks the email verified if the token hash matches and hasn't expired;
+   * the token is cleared so it works once. Returns the email, or null.
+   */
+  async verifyEmail(tokenHash: string): Promise<string | null> {
+    const result = await this.users
+      .createQueryBuilder()
+      .update(User)
+      .set({
+        isEmailVerified: true,
+        emailVerifyTokenHash: null,
+        emailVerifyExpiresAt: null,
+      })
+      .where('email_verify_token_hash = :tokenHash', { tokenHash })
+      .andWhere('email_verify_expires_at > now()')
+      .andWhere('deleted_at IS NULL')
+      .returning(['email'])
+      .execute();
+    const [row] = result.raw as { email: string }[];
+    return row?.email ?? null;
+  }
+
+  /**
+   * Stores a new token for an unverified user, at most once per minute, in
+   * one atomic UPDATE. Returns the new expiry, or why it was refused.
+   */
+  async replaceEmailToken(
+    userId: string,
+    tokenHash: string,
+  ): Promise<
+    | { expiresAt: Date }
+    | { refused: 'ALREADY_VERIFIED' | 'TOO_SOON'; retryAfterSeconds?: number }
+  > {
+    const result = await this.users
+      .createQueryBuilder()
+      .update(User)
+      .set({
+        emailVerifyTokenHash: tokenHash,
+        emailVerifyExpiresAt: () =>
+          `now() + make_interval(hours => ${EMAIL_TOKEN_TTL_HOURS})`,
+      })
+      .where('id = :userId', { userId })
+      .andWhere('is_email_verified = false')
+      // the last token was sent at (expires_at - 24 h)
+      .andWhere(
+        `(email_verify_expires_at IS NULL OR email_verify_expires_at - make_interval(hours => ${EMAIL_TOKEN_TTL_HOURS}) <= now() - make_interval(secs => ${EMAIL_RESEND_COOLDOWN_SECONDS}))`,
+      )
+      .returning('email_verify_expires_at')
+      .execute();
+    const [row] = result.raw as { email_verify_expires_at: Date }[];
+    if (row) {
+      return { expiresAt: new Date(row.email_verify_expires_at) };
+    }
+
+    const user = await this.users.findOneOrFail({ where: { id: userId } });
+    if (user.isEmailVerified) {
+      return { refused: 'ALREADY_VERIFIED' };
+    }
+    const sentAt =
+      (user.emailVerifyExpiresAt?.getTime() ?? 0) -
+      EMAIL_TOKEN_TTL_HOURS * 3600 * 1000;
+    return {
+      refused: 'TOO_SOON',
+      retryAfterSeconds: Math.max(
+        1,
+        Math.ceil(
+          (sentAt + EMAIL_RESEND_COOLDOWN_SECONDS * 1000 - Date.now()) / 1000,
+        ),
+      ),
+    };
   }
 
   /** Loads a non-deleted user with role and password hash, for login. */

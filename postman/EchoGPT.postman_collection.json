@@ -275,6 +275,59 @@
           ]
         },
         {
+          "name": "Verify email (bonus)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/verify-email",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "verify-email"
+              ]
+            },
+            "description": "Verify email (bonus)\n\nUses the one-time token sent at registration (valid 24 h). In development the email is printed to the server console. Verification is not required to use the API.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"q3Zb8Xw1c9RkP0sT4vY7aN2mL5eJ6hG8fD1sA3zQ0xU\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Resend the verification email (bonus)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/resend-verification",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "resend-verification"
+              ]
+            },
+            "description": "Resend the verification email (bonus)\n\nSends a new token; the previous one stops working. At most once per minute."
+          }
+        },
+        {
           "name": "Log out this device",
           "request": {
             "method": "POST",
