@@ -9,6 +9,7 @@ import { UsersModule } from '../users/users.module';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { Session } from './entities/session.entity';
+import { MailService } from './mail.service';
 import { JwtAccessStrategy } from './strategies/jwt-access.strategy';
 import { TokenService } from './token.service';
 
@@ -25,6 +26,7 @@ import { TokenService } from './token.service';
   providers: [
     AuthService,
     TokenService,
+    MailService,
     JwtAccessStrategy,
     { provide: APP_GUARD, useClass: JwtAuthGuard },
   ],
