@@ -47,3 +47,6 @@ this file records choices made while building.
 | D40 | A cache hit writes no AI fields to `api_usage_logs` (feature/provider/ai_success stay null). | ERD §3: those fields are filled only when a provider was actually called, so AI analytics stay accurate. |
 | D41 | "Popular" suggestions need at least 2 different users in the last 7 days. | One person's searches are never suggested to someone else. |
 | D42 | `POST /search` answers `200 OK` (not 201). | It is a query; saving it to history is a side effect. |
+| D43 | Dashboard "chat vs search today" counts domain rows (USER chat messages, `web_searches`); "requests today" counts all HTTP requests in `api_usage_logs`. | Cached searches are real user requests but not AI calls, so the log table alone can't answer both questions. |
+| D44 | Analytics count only rows with `ai_success` set (real AI calls); the range defaults to the last 7 days and is capped at 366 days. `groupBy` maps to fixed SQL snippets. | Success rate and latency describe providers; the cap keeps the query cheap; no user input reaches the SQL text. |
+| D45 | `GET /admin/health` reports the last saved provider status (no live calls) and is `degraded` when the DB is down or the default provider is DOWN. | Health must be fast and free; live checks are `GET /admin/providers/health`. |

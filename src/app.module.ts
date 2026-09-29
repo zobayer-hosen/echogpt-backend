@@ -15,6 +15,7 @@ import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
 import configuration, { AppConfig } from './config/configuration';
 import { validateEnv } from './config/env.validation';
 import { buildDataSourceOptions } from './database/data-source';
+import { AdminModule } from './modules/admin/admin.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { ChatModule } from './modules/chat/chat.module';
 import { HealthModule } from './modules/health/health.module';
@@ -69,6 +70,7 @@ import { UsersModule } from './modules/users/users.module';
     ProvidersModule,
     ChatModule,
     SearchModule,
+    AdminModule,
   ],
   providers: [
     RequestLoggingInterceptor,
