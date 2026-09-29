@@ -1,6 +1,6 @@
 {
   "name": "echogpt-backend",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "EchoGPT backend: REST API for a multi-AI Chrome extension",
   "author": "Zobayer Hosen",
   "private": true,
