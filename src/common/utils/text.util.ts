@@ -7,3 +7,13 @@ export function maskKey(last4: string | null | undefined): string | null {
 export function lastFour(secret: string): string {
   return secret.slice(-4);
 }
+
+/** Trims and collapses all whitespace runs to one space. */
+export function collapseWhitespace(value: string): string {
+  return value.replace(/\s+/g, ' ').trim();
+}
+
+/** Conversation title: first 60 characters of the first prompt (ERD §3). */
+export function conversationTitle(prompt: string): string {
+  return collapseWhitespace(prompt).slice(0, 60) || 'New chat';
+}
