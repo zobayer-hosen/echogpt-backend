@@ -1,0 +1,1621 @@
+{
+  "info": {
+    "_postman_id": "7f3a1c52-8a9e-4d1b-9f0e-ec60e0a1b2c3",
+    "name": "EchoGPT API",
+    "description": "Generated from the OpenAPI document at /api/docs-json.\n\n1. Start the API (`npm run start:dev`) after `npm run migration:run` and `npm run seed`.\n2. Run **Auth → Log in as alice** (or **Log in as admin** for the Admin folders). The token is saved to `{{accessToken}}` automatically.\n3. Requests that create things (chat, search, providers) save their ids into collection variables used by later requests.\n\nDemo password for all demo accounts: `Password123!` (demo only).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000/api/v1"
+    },
+    {
+      "key": "accessToken",
+      "value": ""
+    },
+    {
+      "key": "refreshToken",
+      "value": ""
+    },
+    {
+      "key": "conversationId",
+      "value": ""
+    },
+    {
+      "key": "searchId",
+      "value": ""
+    },
+    {
+      "key": "providerId",
+      "value": ""
+    },
+    {
+      "key": "targetUserId",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Liveness check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health"
+              ]
+            },
+            "description": "Liveness check\n\nPublic. Returns `ok` when the API and its database answer, `down` (503) otherwise. Details are in `GET /admin/health`.",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Create an account",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "register"
+              ]
+            },
+            "description": "Create an account\n\nCreates a USER with a FREE plan in one transaction and logs them in. Email is case-insensitive.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"carol@example.com\",\n  \"password\": \"Secret123!\",\n  \"fullName\": \"Carol Chen\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "if (pm.response.code < 300 && body.accessToken) {",
+                  "  pm.collectionVariables.set('accessToken', body.accessToken);",
+                  "  pm.collectionVariables.set('refreshToken', body.refreshToken);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Log in as alice (FREE user)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Log in\n\nStarts a new session (one per device). Limited to 5 attempts per minute per IP.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"alice@echogpt.dev\",\n  \"password\": \"Password123!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "if (pm.response.code < 300 && body.accessToken) {",
+                  "  pm.collectionVariables.set('accessToken', body.accessToken);",
+                  "  pm.collectionVariables.set('refreshToken', body.refreshToken);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Log in as admin",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "if (pm.response.code < 300 && body.accessToken) {",
+                  "  pm.collectionVariables.set('accessToken', body.accessToken);",
+                  "  pm.collectionVariables.set('refreshToken', body.refreshToken);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Logs in the demo admin (needed for the Admin folders).",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@echogpt.dev\",\n  \"password\": \"Password123!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Rotate tokens",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/refresh",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "refresh"
+              ]
+            },
+            "description": "Rotate tokens\n\nReturns a new access token **and** a new refresh token. The old refresh token stops working; using it again revokes the session.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "if (pm.response.code < 300 && body.accessToken) {",
+                  "  pm.collectionVariables.set('accessToken', body.accessToken);",
+                  "  pm.collectionVariables.set('refreshToken', body.refreshToken);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Log out this device",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/logout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "logout"
+              ]
+            },
+            "description": "Log out this device\n\nRevokes the current session. Its access and refresh tokens stop working immediately."
+          }
+        },
+        {
+          "name": "Log out all devices",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/logout-all",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "logout-all"
+              ]
+            },
+            "description": "Log out all devices\n\nRevokes every active session of the current user."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "Get my profile",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/users/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "me"
+              ]
+            },
+            "description": "Get my profile\n\nYour account and current plan. Never includes the password hash."
+          }
+        },
+        {
+          "name": "Update my profile",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "me"
+              ]
+            },
+            "description": "Update my profile\n\nOnly `fullName` and `avatarUrl` can change. Any other field is rejected with 400.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Alice Anderson\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Delete my account",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "me"
+              ]
+            },
+            "description": "Delete my account\n\nNeeds the current password. Soft delete: you are logged out everywhere and the email can be registered again. The last admin cannot delete themselves.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"password\": \"Password123!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Change my password",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/me/password",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "me",
+                "password"
+              ]
+            },
+            "description": "Change my password\n\nNeeds the current password. The new one must differ. Every **other** session is logged out; this one stays.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPassword\": \"Password123!\",\n  \"newPassword\": \"NewSecret456!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Plans",
+      "item": [
+        {
+          "name": "List plans",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/plans",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "plans"
+              ]
+            },
+            "description": "List plans\n\nPublic. Daily limits come from `FREE_DAILY_LIMIT` / `PREMIUM_DAILY_LIMIT`. Prices are shown only; upgrades are simulated.",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Subscriptions",
+      "item": [
+        {
+          "name": "My subscription status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/subscriptions/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "subscriptions",
+                "me"
+              ]
+            },
+            "description": "My subscription status"
+          }
+        },
+        {
+          "name": "Upgrade or downgrade",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/subscriptions/me/change",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "subscriptions",
+                "me",
+                "change"
+              ]
+            },
+            "description": "Upgrade or downgrade\n\nImmediate and simulated (no payment). Today’s usage is kept: after a downgrade, `remaining` can be 0.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"plan\": \"PREMIUM\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "My remaining requests today",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/subscriptions/me/usage",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "subscriptions",
+                "me",
+                "usage"
+              ]
+            },
+            "description": "My remaining requests today\n\nEvery chat message and search counts one request. The counter resets at 00:00 UTC."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Providers",
+      "item": [
+        {
+          "name": "List AI providers you can use",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/providers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "providers"
+              ]
+            },
+            "description": "List AI providers you can use\n\nEnabled providers only, default first. Pass an `id` as `providerId` to chat or search; omit it to use the default. Short, fixed-size list, so not paginated."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const list = pm.response.json();",
+                  "if (Array.isArray(list) && list.length) pm.collectionVariables.set('providerId', list[0].id);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Chat",
+      "item": [
+        {
+          "name": "Send a prompt in a new conversation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/chat/messages",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "chat",
+                "messages"
+              ]
+            },
+            "description": "Send a prompt in a new conversation\n\nCreates a conversation (titled from the prompt), asks the provider, saves both messages. Counts one request. A failed AI call does not count.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"prompt\": \"Give me 3 tips for writing clear emails.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) pm.collectionVariables.set('conversationId', pm.response.json().conversation.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create an empty conversation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/chat/conversations",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "chat",
+                "conversations"
+              ]
+            },
+            "description": "Create an empty conversation\n\nDoes not count as a request.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Trip planning\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) pm.collectionVariables.set('conversationId', pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List my conversations",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/chat/conversations",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "chat",
+                "conversations"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "List my conversations\n\nMost recently active first, paginated."
+          }
+        },
+        {
+          "name": "Get a conversation with its messages",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/chat/conversations/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "chat",
+                "conversations",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{conversationId}}"
+                }
+              ]
+            },
+            "description": "Get a conversation with its messages\n\nMessages oldest first. Another user’s conversation is 404."
+          }
+        },
+        {
+          "name": "Rename a conversation",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/chat/conversations/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "chat",
+                "conversations",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{conversationId}}"
+                }
+              ]
+            },
+            "description": "Rename a conversation",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Trip planning (Rome)\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Delete a conversation",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/chat/conversations/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "chat",
+                "conversations",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{conversationId}}"
+                }
+              ]
+            },
+            "description": "Delete a conversation\n\nSoft delete: it disappears from your history."
+          }
+        },
+        {
+          "name": "Send a prompt in a conversation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/chat/conversations/:id/messages",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "chat",
+                "conversations",
+                ":id",
+                "messages"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{conversationId}}"
+                }
+              ]
+            },
+            "description": "Send a prompt in a conversation\n\nThe last 20 messages go to the provider as context. Counts one request; a failed AI call does not count. `providerId` is optional (default provider).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"prompt\": \"Make it shorter.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Search",
+      "item": [
+        {
+          "name": "AI-assisted web search",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/search",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "search"
+              ]
+            },
+            "description": "AI-assisted web search\n\nReturns a short answer and a list of pages, and saves the search to your history. Counts one request. The same normalized query + provider within 1 hour is served from cache (`fromCache: true`, provider not called) and still counts.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"best practices for chrome extension security\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) pm.collectionVariables.set('searchId', pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "My search history",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/search/history",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "search",
+                "history"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "My search history\n\nNewest first."
+          }
+        },
+        {
+          "name": "Clear my search history",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/search/history",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "search",
+                "history"
+              ]
+            },
+            "description": "Clear my search history"
+          }
+        },
+        {
+          "name": "Delete one search from my history",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/search/history/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "search",
+                "history",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{searchId}}"
+                }
+              ]
+            },
+            "description": "Delete one search from my history"
+          }
+        },
+        {
+          "name": "My recent searches",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/search/recent",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "search",
+                "recent"
+              ]
+            },
+            "description": "My recent searches\n\nThe last 10 distinct queries, newest first."
+          }
+        },
+        {
+          "name": "Search suggestions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/search/suggestions?q=chrome ext",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "search",
+                "suggestions"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "chrome ext",
+                  "disabled": false
+                }
+              ]
+            },
+            "description": "Search suggestions\n\nUp to 8 queries starting with `q`: your own past queries first, then queries several users searched in the last 7 days."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin · Dashboard",
+      "item": [
+        {
+          "name": "Dashboard statistics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/dashboard",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "dashboard"
+              ]
+            },
+            "description": "Dashboard statistics\n\nUsers (total, new in 7 days, per plan), requests today (HTTP, chat, search), AI error rate in the last 24 h and provider health."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin · Users",
+      "item": [
+        {
+          "name": "List users",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "users"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "disabled": true
+                },
+                {
+                  "key": "search",
+                  "value": "alice",
+                  "disabled": true
+                },
+                {
+                  "key": "role",
+                  "value": "ADMIN",
+                  "disabled": true
+                },
+                {
+                  "key": "status",
+                  "value": "ACTIVE",
+                  "disabled": true
+                },
+                {
+                  "key": "plan",
+                  "value": "FREE",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "List users\n\nSearch by email/name and filter by role, status and plan. Newest first, paginated."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const page = pm.response.json();",
+                  "const user = (page.data || []).find((u) => u.role === 'USER');",
+                  "if (user) pm.collectionVariables.set('targetUserId', user.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get one user",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/users/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "users",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{targetUserId}}"
+                }
+              ]
+            },
+            "description": "Get one user"
+          }
+        },
+        {
+          "name": "Change role or status",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/users/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "users",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{targetUserId}}"
+                }
+              ]
+            },
+            "description": "Change role or status\n\nPromote/demote or suspend/reactivate. Suspending logs the user out everywhere. The last active admin cannot be demoted or suspended.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"ACTIVE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Delete a user",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/users/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "users",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{targetUserId}}"
+                }
+              ]
+            },
+            "description": "Delete a user\n\nSoft delete: revokes all sessions and frees the email."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin · Subscriptions",
+      "item": [
+        {
+          "name": "List subscriptions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/subscriptions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "subscriptions"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "disabled": true
+                },
+                {
+                  "key": "plan",
+                  "value": "FREE",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "List subscriptions\n\nEvery user's plan and today's usage. Filter by plan; sorted by email."
+          }
+        },
+        {
+          "name": "Change a user's plan",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/subscriptions/:userId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "subscriptions",
+                ":userId"
+              ],
+              "variable": [
+                {
+                  "key": "userId",
+                  "value": "{{targetUserId}}"
+                }
+              ]
+            },
+            "description": "Change a user's plan",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"plan\": \"PREMIUM\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin · Providers",
+      "item": [
+        {
+          "name": "List all providers",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/providers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "providers"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "List all providers\n\nEnabled and disabled. Keys are never returned: only `hasApiKey` and `apiKeyMasked`."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const page = pm.response.json();",
+                  "if (page.data && page.data.length) pm.collectionVariables.set('providerId', page.data[0].id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Add a provider",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/providers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "providers"
+              ]
+            },
+            "description": "Add a provider\n\n`apiKey` is required unless `type` is MOCK. It is encrypted (AES-256-GCM) before saving and never returned.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"OpenAI (my key)\",\n  \"type\": \"OPENAI\",\n  \"model\": \"gpt-4o-mini\",\n  \"apiKey\": \"sk-your-key-here\",\n  \"isEnabled\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Health-check all enabled providers",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/providers/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "providers",
+                "health"
+              ]
+            },
+            "description": "Health-check all enabled providers\n\nRuns a tiny real call against every enabled provider in parallel, saves UP/DOWN and logs each call."
+          }
+        },
+        {
+          "name": "Edit a provider",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/providers/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "providers",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{providerId}}"
+                }
+              ]
+            },
+            "description": "Edit a provider\n\nAny field. A new `apiKey` replaces the old one; omitting it keeps the current key.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"model\": \"gpt-4o-mini\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Delete a provider",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/providers/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "providers",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{providerId}}"
+                }
+              ]
+            },
+            "description": "Delete a provider\n\nNot allowed for the default provider. Chat and search history keep working (provider set to null)."
+          }
+        },
+        {
+          "name": "Enable or disable",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/providers/:id/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "providers",
+                ":id",
+                "status"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{providerId}}"
+                }
+              ]
+            },
+            "description": "Enable or disable\n\nDisabled providers cannot be used. The default cannot be disabled; a non-MOCK provider needs a key before it can be enabled.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isEnabled\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Make this the default provider",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/providers/:id/default",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "providers",
+                ":id",
+                "default"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{providerId}}"
+                }
+              ]
+            },
+            "description": "Make this the default provider\n\nSwitches in one transaction; the database allows only one default and it must be enabled."
+          }
+        },
+        {
+          "name": "Health-check one provider",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/providers/:id/health-check",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "providers",
+                ":id",
+                "health-check"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{providerId}}"
+                }
+              ]
+            },
+            "description": "Health-check one provider\n\nMakes a tiny real call (reads the model), saves UP/DOWN and the time, logs it, and returns the latency. A failing provider is reported as DOWN, not as an error."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin · Analytics",
+      "item": [
+        {
+          "name": "AI usage analytics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/analytics/usage",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "analytics",
+                "usage"
+              ],
+              "query": [
+                {
+                  "key": "from",
+                  "value": "2026-09-22T00:00:00.000Z",
+                  "disabled": true
+                },
+                {
+                  "key": "to",
+                  "value": "2026-09-30T00:00:00.000Z",
+                  "disabled": true
+                },
+                {
+                  "key": "groupBy",
+                  "value": "day",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "AI usage analytics\n\nAI provider calls between `from` and `to` (default: last 7 days, max 366), grouped by `day` (UTC), `provider` or `feature`: counts, success rate and average latency. Cached searches are not AI calls and are not counted."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin · Logs",
+      "item": [
+        {
+          "name": "HTTP request logs",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/logs/requests",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "logs",
+                "requests"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "disabled": true
+                },
+                {
+                  "key": "from",
+                  "value": "2026-09-29T00:00:00.000Z",
+                  "disabled": true
+                },
+                {
+                  "key": "to",
+                  "value": "2026-09-30T00:00:00.000Z",
+                  "disabled": true
+                },
+                {
+                  "key": "status",
+                  "value": "429",
+                  "disabled": true
+                },
+                {
+                  "key": "userId",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "path",
+                  "value": "/api/v1/chat",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "HTTP request logs\n\nOne row per request, newest first. Filter by time range, status code, user and part of the path. Bodies and query strings are never stored."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin · Health",
+      "item": [
+        {
+          "name": "System health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "health"
+              ]
+            },
+            "description": "System health\n\nDatabase ping and latency, uptime, memory, Node version and the last saved status of every provider. Use `GET /admin/providers/health` for live provider checks."
+          }
+        }
+      ]
+    }
+  ]
+}

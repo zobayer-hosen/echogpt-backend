@@ -29,17 +29,27 @@ export function setupSwagger(app: INestApplication): void {
     .setTitle('EchoGPT API')
     .setDescription(
       [
-        'REST API for the EchoGPT multi-AI Chrome extension.',
+        'REST API for the EchoGPT multi-AI Chrome extension: chat with several AI providers, AI-assisted web search, Free/Premium plans with daily limits, and admin APIs.',
         '',
-        '**Auth:** call `POST /auth/login`, then click **Authorize** and paste the `accessToken`.',
-        'Access tokens live 15 minutes; use `POST /auth/refresh` with the refresh token to rotate.',
+        '### Quick start',
+        '1. `POST /auth/login` with a demo account (password `Password123!`, demo only):',
+        '   `alice@echogpt.dev` (FREE, 20 requests/day) · `bob@echogpt.dev` (PREMIUM, 500/day) · `admin@echogpt.dev` (ADMIN)',
+        '2. Click **Authorize** and paste the `accessToken`.',
+        '3. `POST /chat/messages` with `{ "prompt": "Hello" }`. The seeded **Mock AI** provider answers for free; admins can add OpenAI, Anthropic or Gemini keys.',
         '',
-        '**Errors** always have the shape `{ statusCode, code, message, details?, timestamp, path, requestId }`.',
-        '',
-        '**Lists** accept `?page=1&limit=20` (max 100) and return `{ data, meta: { page, limit, total, totalPages } }`.',
+        '### Conventions',
+        '- **Tokens:** access 15 min, refresh 7 days. `POST /auth/refresh` rotates both; an old refresh token revokes the session.',
+        '- **Errors:** `{ statusCode, code, message, details?, timestamp, path, requestId }`. Every response has an `x-request-id` header.',
+        '- **Lists:** `?page=1&limit=20` (max 100) → `{ data, meta: { page, limit, total, totalPages } }`.',
+        '- **Usage:** each chat message and search counts 1 request per UTC day; a failed AI call does not count.',
+        '- **Rate limits:** 60 requests/min per IP, 5 logins/min per IP → `429 RATE_LIMITED`.',
       ].join('\n'),
     )
     .setVersion('1.0.0')
+    .setExternalDoc(
+      'README and design docs',
+      'https://github.com/zobayer-hosen/echogpt-backend',
+    )
     .addBearerAuth(
       {
         type: 'http',
