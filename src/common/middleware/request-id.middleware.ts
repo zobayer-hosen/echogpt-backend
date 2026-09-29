@@ -19,6 +19,15 @@ export class RequestIdMiddleware implements NestMiddleware {
         : randomUUID();
     req.requestId = requestId;
     res.setHeader('x-request-id', requestId);
-    RequestContext.run({ requestId, startedAt: Date.now() }, () => next());
+    RequestContext.run(
+      {
+        requestId,
+        startedAt: Date.now(),
+        method: req.method,
+        path: req.originalUrl.split('?')[0],
+        ip: req.ip ?? null,
+      },
+      () => next(),
+    );
   }
 }
