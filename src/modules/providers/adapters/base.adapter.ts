@@ -13,6 +13,12 @@ import {
 
 export type FetchFn = typeof fetch;
 
+/** One Server-Sent Event from a provider stream. */
+export interface SseEvent {
+  event: string;
+  data: string;
+}
+
 export const CHAT_SYSTEM_PROMPT =
   'You are EchoGPT, a helpful assistant inside a browser side panel. Answer clearly and concisely.';
 
@@ -46,10 +52,24 @@ export abstract class BaseAdapter implements AiProviderAdapter {
   /** Provider-specific cheap call that proves key and model work. */
   protected abstract ping(): Promise<void>;
 
+  /** Provider-specific streaming call; yields text pieces. */
+  protected abstract streamComplete(
+    messages: ChatTurn[],
+    system: string,
+    signal: AbortSignal,
+  ): AsyncIterable<string>;
+
   async chat(messages: ChatTurn[]): Promise<ChatResult> {
     const started = Date.now();
     const content = await this.complete(messages, CHAT_SYSTEM_PROMPT);
     return { content, latencyMs: Date.now() - started };
+  }
+
+  chatStream(
+    messages: ChatTurn[],
+    signal: AbortSignal = new AbortController().signal,
+  ): AsyncIterable<string> {
+    return this.streamComplete(messages, CHAT_SYSTEM_PROMPT, signal);
   }
 
   async search(query: string): Promise<SearchResult> {
@@ -122,6 +142,106 @@ export abstract class BaseAdapter implements AiProviderAdapter {
     return response;
   }
 
+  /**
+   * POST that answers with `text/event-stream`. The timeout is an idle
+   * timeout: it restarts on every chunk, so long answers keep streaming while
+   * a stalled provider still fails with 504. Aborting `signal` stops the call.
+   */
+  protected async *streamEvents(
+    url: string,
+    init: RequestInit,
+    signal: AbortSignal,
+  ): AsyncGenerator<SseEvent> {
+    const controller = new AbortController();
+    let timedOut = false;
+    const onTimeout = () => {
+      timedOut = true;
+      controller.abort();
+    };
+    let timer = setTimeout(onTimeout, this.config.timeoutMs);
+    const restartTimer = () => {
+      clearTimeout(timer);
+      timer = setTimeout(onTimeout, this.config.timeoutMs);
+    };
+    const onCallerAbort = () => controller.abort();
+    signal.addEventListener('abort', onCallerAbort, { once: true });
+
+    try {
+      const doFetch = this.fetchFn;
+      let response: Response;
+      try {
+        response = await doFetch(url, { ...init, signal: controller.signal });
+      } catch (error) {
+        throw timedOut
+          ? this.mapFetchError({ name: 'TimeoutError' }, '')
+          : this.mapFetchError(error, 'could not be reached');
+      }
+      if (!response.ok || !response.body) {
+        throw new AppException(
+          HttpStatus.BAD_GATEWAY,
+          ErrorCode.PROVIDER_ERROR,
+          `${this.label} returned HTTP ${response.status}`,
+          { provider: this.label, providerStatus: response.status },
+        );
+      }
+
+      const reader = response.body.getReader();
+      // make a pending read() finish when we abort (idle timeout or caller)
+      controller.signal.addEventListener(
+        'abort',
+        () => void reader.cancel().catch(() => undefined),
+        { once: true },
+      );
+      const decoder = new TextDecoder();
+      let buffer = '';
+      for (;;) {
+        let chunk: ReadableStreamReadResult<Uint8Array>;
+        try {
+          chunk = await reader.read();
+        } catch (error) {
+          throw this.mapFetchError(error, 'stream was interrupted');
+        }
+        if (chunk.done || controller.signal.aborted) {
+          break;
+        }
+        restartTimer();
+        buffer += decoder.decode(chunk.value, { stream: true });
+        let boundary = buffer.search(/\r?\n\r?\n/);
+        while (boundary !== -1) {
+          const raw = buffer.slice(0, boundary);
+          buffer = buffer.slice(boundary).replace(/^\r?\n\r?\n/, '');
+          const event = parseSseEvent(raw);
+          if (event) {
+            yield event;
+          }
+          boundary = buffer.search(/\r?\n\r?\n/);
+        }
+      }
+      if (timedOut) {
+        throw this.mapFetchError({ name: 'TimeoutError' }, '');
+      }
+      if (signal.aborted) {
+        throw new DOMException('The caller aborted the stream', 'AbortError');
+      }
+    } finally {
+      clearTimeout(timer);
+      signal.removeEventListener('abort', onCallerAbort);
+    }
+  }
+
+  protected parseJson<T>(data: string): T {
+    try {
+      return JSON.parse(data) as T;
+    } catch {
+      throw new AppException(
+        HttpStatus.BAD_GATEWAY,
+        ErrorCode.PROVIDER_ERROR,
+        `${this.label} sent an invalid stream event`,
+        { provider: this.label },
+      );
+    }
+  }
+
   protected emptyAnswer(): AppException {
     return new AppException(
       HttpStatus.BAD_GATEWAY,
@@ -148,6 +268,20 @@ export abstract class BaseAdapter implements AiProviderAdapter {
       { provider: this.label },
     );
   }
+}
+
+/** `event: x\ndata: y` block → { event, data }; comments and empty blocks are skipped. */
+export function parseSseEvent(raw: string): SseEvent | null {
+  let event = 'message';
+  const data: string[] = [];
+  for (const line of raw.split(/\r?\n/)) {
+    if (line.startsWith('event:')) {
+      event = line.slice(6).trim();
+    } else if (line.startsWith('data:')) {
+      data.push(line.slice(5).replace(/^ /, ''));
+    }
+  }
+  return data.length ? { event, data: data.join('\n') } : null;
 }
 
 const isHttpUrl = (value: unknown): value is string => {

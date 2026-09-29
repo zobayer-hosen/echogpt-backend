@@ -10,6 +10,7 @@ import {
   Patch,
   Post,
   Query,
+  Res,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -18,8 +19,10 @@ import {
   ApiOkResponse,
   ApiOperation,
   ApiParam,
+  ApiProduces,
   ApiTags,
 } from '@nestjs/swagger';
+import type { Response } from 'express';
 import { ErrorCode } from '../../common/constants/error-codes';
 import {
   ApiError,
@@ -119,6 +122,19 @@ const AI_CALL_ERRORS = [
     'OpenAI did not answer within 30s',
   ),
 ];
+
+const SSE_EXAMPLE = [
+  'event: token',
+  'data: {"text":"Here "}',
+  '',
+  'event: token',
+  'data: {"text":"are 3 tips…"}',
+  '',
+  'event: done',
+  `data: ${JSON.stringify(REPLY)}`,
+  '',
+  '',
+].join('\n');
 
 @ApiTags('Chat')
 @ApiBearerAuth(BEARER_AUTH)
@@ -260,4 +276,77 @@ export class ChatController {
   ): Promise<ChatReplyDto> {
     return this.chat.sendMessage(user.id, id, dto);
   }
+
+  @Post('conversations/:id/messages/stream')
+  @CONVERSATION_ID
+  @ApiProduces('text/event-stream')
+  @ApiOperation({
+    summary: 'Send a prompt and stream the answer (SSE)',
+    description: [
+      'Same rules as the non-streaming endpoint, answered as `text/event-stream`:',
+      '',
+      '- `event: token` / `data: {"text": "..."}` for each piece of the answer',
+      '- `event: done` / `data: {conversation, userMessage, assistantMessage, usage}` once both messages are saved',
+      '- `event: error` / `data: {code, message}` if the provider fails after streaming started (the request is given back, nothing is saved)',
+      '',
+      'Errors before streaming starts (validation, auth, not found, disabled provider, usage limit) are normal JSON error responses. If the client disconnects, the provider call stops and nothing is saved.',
+    ].join('\n'),
+  })
+  @ApiOkResponse({
+    description: 'Server-Sent Events stream',
+    content: {
+      'text/event-stream': {
+        schema: { type: 'string' },
+        example: SSE_EXAMPLE,
+      },
+    },
+  })
+  @ApiErrorResponses(...AI_CALL_ERRORS, ApiError.notFound('Conversation'))
+  async stream(
+    @CurrentUser() user: AuthUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: SendMessageDto,
+    @Res() res: Response,
+  ): Promise<void> {
+    const abort = new AbortController();
+    res.on('close', () => {
+      if (!res.writableEnded) {
+        abort.abort();
+      }
+    });
+    // checks run first: their errors are normal JSON responses
+    const events = await this.chat.streamMessage(
+      user.id,
+      id,
+      dto,
+      abort.signal,
+    );
+
+    res.status(HttpStatus.OK).set({
+      'Content-Type': 'text/event-stream; charset=utf-8',
+      'Cache-Control': 'no-cache, no-transform',
+      Connection: 'keep-alive',
+      'X-Accel-Buffering': 'no',
+    });
+    res.flushHeaders();
+    try {
+      for await (const event of events) {
+        res.write(sseFrame(event.event, event.data));
+      }
+    } catch {
+      res.write(
+        sseFrame('error', {
+          code: 'INTERNAL_ERROR',
+          message: 'Internal server error',
+        }),
+      );
+    } finally {
+      res.end();
+    }
+  }
+}
+
+/** One Server-Sent Events frame. */
+function sseFrame(event: string, data: unknown): string {
+  return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
 }

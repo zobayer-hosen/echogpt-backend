@@ -51,6 +51,8 @@ const PRD_ENDPOINTS = [
   'PATCH /chat/conversations/{id}',
   'DELETE /chat/conversations/{id}',
   'POST /chat/conversations/{id}/messages',
+  // bonus
+  'POST /chat/conversations/{id}/messages/stream',
   'POST /search',
   'GET /search/history',
   'DELETE /search/history',

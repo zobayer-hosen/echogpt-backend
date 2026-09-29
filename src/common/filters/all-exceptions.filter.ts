@@ -58,6 +58,10 @@ export class AllExceptionsFilter implements ExceptionFilter {
     }
 
     if (res.headersSent) {
+      // e.g. a stream already started: just close it
+      if (!res.writableEnded) {
+        res.end();
+      }
       return;
     }
 
